@@ -249,6 +249,14 @@ class WeatherGuessingGame:
         """시도 횟수 업데이트"""
         self.attempts_label.config(text=f"시도 횟수: {self.attempts}/{self.max_attempts}")
     
+    def select_next_city(self):
+        """현재 도시를 제외한 다른 도시 중에서 랜덤하게 선택"""
+        current_city = self.city_var.get()
+        available_cities = [city for city in self.cities.keys() if city != current_city]
+        next_city = random.choice(available_cities)
+        self.city_var.set(next_city)
+        return next_city
+
     def check_guess(self):
         """추측 확인"""
         if not self.game_active:
@@ -268,14 +276,13 @@ class WeatherGuessingGame:
         
         # 정답 확인
         if guess == self.target_temp:
-            self.game_active = False
-            self.guess_btn.config(state='disabled')
-            self.start_btn.config(state='normal')
-            
+            next_city = self.select_next_city()
             messagebox.showinfo("축하합니다! 🎉",
                               f"정답입니다!\n\n"
                               f"온도: {self.target_temp}°C\n"
-                              f"시도 횟수: {self.attempts}회")
+                              f"시도 횟수: {self.attempts}회\n\n"
+                              f"다음 도시 {next_city}로 이동합니다!")
+            self.start_game()  # 다음 도시로 자동 시작
             return
         
         # 힌트 제공
