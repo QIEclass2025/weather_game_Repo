@@ -166,7 +166,7 @@ class WeatherGuessingGame:
                 current = data['current']
                 
                 return {
-                    'temperature': round(current['temperature_2m']),
+                    'temperature': round(current['temperature_2m'],1),
                     'humidity': current['relative_humidity_2m'],
                     'weather_code': current['weather_code']
                 }
@@ -233,7 +233,7 @@ class WeatherGuessingGame:
         self.attempts = 0
         self.game_active = True
         self.update_attempts()
-        self.hint_label.config(text="범위: -30°C ~ 50°C")
+        self.hint_label.config(text="범위: -30.0°C ~ 50.0°C")
         
         # 버튼 상태 변경
         self.start_btn.config(state='disabled')
@@ -243,7 +243,7 @@ class WeatherGuessingGame:
         
         messagebox.showinfo("게임 시작", 
                           f"{city}의 현재 온도를 맞춰보세요!\n"
-                          f"10번의 기회가 있습니다.")
+                          f"10번의 기회가 있습니다. \n 소수점 첫째 자리까지 입력하세요.")
     
     def update_attempts(self):
         """시도 횟수 업데이트"""
@@ -256,7 +256,7 @@ class WeatherGuessingGame:
             return
         
         try:
-            guess = int(self.temp_entry.get())
+            guess = round(float(self.temp_entry.get()), 1)
         except ValueError:
             messagebox.showerror("오류", "올바른 숫자를 입력하세요!")
             return
