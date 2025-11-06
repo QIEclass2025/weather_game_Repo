@@ -26,10 +26,9 @@
    ```
    git clone https://github.com/QIEclass2025/weather_game_Repo.git
    ```
-2. 필요한 패키지를 설치합니다:
+2. uv 패키지 매니저를 이용해 실행합니다:
    ```
-   uv 패키지 매니저를 이용해 실행합니다.
-    uv run weather_game.py
+   uv run weather_game.py
    ```
 
 ## 게임 실행 방법
