@@ -174,6 +174,16 @@ class WeatherGuessingGame:
                                    width=12, height=2)
         self.advice_btn.grid(row=0, column=2, padx=5)
         
+        # 그만두기 버튼: 게임 중단 후 다른 도시 선택 가능
+        self.stop_btn = tk.Button(button_frame, text="⛔ 그만두기",
+                      command=self.stop_game,
+                      font=('Arial', 11, 'bold'),
+                      bg='#F44336', fg='white',
+                      width=12, height=2,
+                      state='disabled')
+        # place to the right of other buttons
+        self.stop_btn.grid(row=0, column=3, padx=5)
+        
         # 조언 표시 프레임
         advice_frame = tk.LabelFrame(self.root, text="💭 오늘의 조언",
                                     font=('Arial', 11, 'bold'),
@@ -339,6 +349,7 @@ class WeatherGuessingGame:
         # 버튼 상태 변경
         self.start_btn.config(state='disabled')
         self.guess_btn.config(state='normal')
+        self.stop_btn.config(state='normal')
         self.temp_entry.delete(0, 'end')
         self.temp_entry.focus()
         
@@ -359,6 +370,33 @@ class WeatherGuessingGame:
         next_city = random.choice(available_cities)
         self.city_var.set(next_city)
         return next_city
+
+    def stop_game(self):
+        """현재 게임을 중단하고 사용자가 다른 도시를 선택할 수 있게 설정"""
+        if not self.game_active:
+            return
+
+        self.game_active = False
+        # 버튼 상태: 추측 버튼 비활성화, 시작 버튼 활성화, 그만두기 버튼 비활성화
+        try:
+            self.guess_btn.config(state='disabled')
+            self.stop_btn.config(state='disabled')
+            self.start_btn.config(state='normal')
+        except Exception:
+            pass
+
+        # 시도 초기화 (중단 상태로 변경)
+        self.attempts = 0
+        self.update_attempts()
+
+        # 힌트 표시
+        self.hint_label.config(text="게임이 중단되었습니다. 다른 도시를 선택하세요.")
+
+        # 조언 버튼 상태 갱신: 설정에 따라 활성화
+        if getattr(self, 'advice_enabled', tk.BooleanVar(value=True)).get() and not getattr(self, 'advice_used', False):
+            self.advice_btn.config(state='normal')
+        else:
+            self.advice_btn.config(state='disabled')
 
     def _on_toggle_advice(self):
         """설정에서 조언 사용 토글 처리: 버튼 상태 업데이트"""
