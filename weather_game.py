@@ -54,7 +54,10 @@ class WeatherGuessingGame:
             "런던": (51.5074, -0.1278),
             "도쿄": (35.6762, 139.6503),
             "파리": (48.8566, 2.3522),
-            "시드니": (-33.8688, 151.2093)
+            "시드니": (-33.8688, 151.2093),
+            "베를린": (52.5200, 13.4050),
+            "싱가포르": (1.3521, 103.8198),
+            "모스크바": (55.7558, 37.6173)
         }
         
         tk.Label(city_frame, text="도시를 선택하세요:",
@@ -96,6 +99,37 @@ class WeatherGuessingGame:
                                   font=('Arial', 10),
                                   bg='#C8E6C9', fg='#424242')
         self.hint_label.pack(pady=5)
+        
+        # 설정 프레임 (난이도, 모드, 날짜)
+        settings_frame = tk.LabelFrame(self.root, text="⚙️ 게임 설정",
+                           font=('Arial', 12, 'bold'),
+                           bg='#E8EAF6', padx=15, pady=10)
+        settings_frame.pack(pady=10, padx=20, fill='x')
+
+        tk.Label(settings_frame, text="난이도:", font=('Arial', 10), bg='#E8EAF6').grid(row=0, column=0, sticky='w')
+        self.difficulty_var = tk.StringVar(value='보통')
+        diff_menu = ttk.Combobox(settings_frame, textvariable=self.difficulty_var,
+                     values=['쉬움', '보통', '어려움'], state='readonly', width=8)
+        diff_menu.grid(row=0, column=1, padx=5, sticky='w')
+
+        tk.Label(settings_frame, text="모드:", font=('Arial', 10), bg='#E8EAF6').grid(row=0, column=2, sticky='w', padx=(20,0))
+        self.mode_var = tk.StringVar(value='현재')
+        tk.Radiobutton(settings_frame, text='현재', variable=self.mode_var, value='현재', bg='#E8EAF6').grid(row=0, column=3, sticky='w')
+        tk.Radiobutton(settings_frame, text='과거(날짜)', variable=self.mode_var, value='과거', bg='#E8EAF6').grid(row=0, column=4, sticky='w')
+
+        tk.Label(settings_frame, text="날짜(YYYY-MM-DD):", font=('Arial', 10), bg='#E8EAF6').grid(row=1, column=0, sticky='w', pady=5)
+        self.date_entry = tk.Entry(settings_frame, width=15)
+        self.date_entry.grid(row=1, column=1, sticky='w', pady=5)
+
+        # 점수 표시 프레임
+        score_frame = tk.Frame(self.root, bg='#E3F2FD')
+        score_frame.pack(pady=5)
+        self.score = 0
+        self.combo = 0
+        self.score_label = tk.Label(score_frame, text=f"점수: {self.score}", font=('Arial', 11, 'bold'), bg='#E3F2FD')
+        self.score_label.pack(side='left', padx=10)
+        self.combo_label = tk.Label(score_frame, text=f"콤보: {self.combo}", font=('Arial', 11), bg='#E3F2FD')
+        self.combo_label.pack(side='left', padx=10)
         
         # 입력 프레임
         input_frame = tk.Frame(self.root, bg='#E3F2FD')
@@ -147,10 +181,50 @@ class WeatherGuessingGame:
         self.advice_text.pack(pady=5)
         self.advice_text.insert('1.0', "💡 '조언 받기' 버튼을 눌러 조언을 받아보세요!")
         self.advice_text.config(state='disabled')
+        self.advice_used = False
         
     def fetch_weather(self, lat, lon):
-        """Weather API에서 날씨 데이터 가져오기"""
+        """Weather API에서 날씨 데이터 가져오기.
+
+        현재 날씨 또는 과거 특정 날짜(일별 평균)를 가져올 수 있습니다.
+        """
         try:
+            # 과거 모드: daily 온도(최고/최저)를 요청하여 평균을 사용
+            if hasattr(self, 'mode_var') and self.mode_var.get() == '과거' and hasattr(self, 'date_entry'):
+                date_str = self.date_entry.get().strip()
+                if not date_str:
+                    messagebox.showwarning("날짜 필요", "과거 모드를 선택했으면 날짜를 입력하세요 (YYYY-MM-DD).")
+                    return None
+
+                url = "https://api.open-meteo.com/v1/forecast"
+                params = {
+                    "latitude": lat,
+                    "longitude": lon,
+                    "daily": "temperature_2m_max,temperature_2m_min,weathercode",
+                    "start_date": date_str,
+                    "end_date": date_str,
+                    "timezone": "auto"
+                }
+                response = requests.get(url, params=params, timeout=8)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    daily = data.get('daily', {})
+                    tmax = daily.get('temperature_2m_max', [None])[0]
+                    tmin = daily.get('temperature_2m_min', [None])[0]
+                    weather_code = daily.get('weathercode', [None])[0]
+                    if tmax is None or tmin is None:
+                        return None
+                    mean_temp = round((tmax + tmin) / 2.0, 1)
+                    return {
+                        'temperature': mean_temp,
+                        'humidity': None,
+                        'weather_code': weather_code
+                    }
+                else:
+                    return None
+
+            # 기본: 현재 날씨
             url = "https://api.open-meteo.com/v1/forecast"
             params = {
                 "latitude": lat,
@@ -158,17 +232,14 @@ class WeatherGuessingGame:
                 "current": "temperature_2m,relative_humidity_2m,weather_code",
                 "timezone": "auto"
             }
-            
             response = requests.get(url, params=params, timeout=5)
-            
             if response.status_code == 200:
                 data = response.json()
-                current = data['current']
-                
+                current = data.get('current', {})
                 return {
-                    'temperature': round(current['temperature_2m'],1),
-                    'humidity': current['relative_humidity_2m'],
-                    'weather_code': current['weather_code']
+                    'temperature': round(current.get('temperature_2m', 0.0), 1),
+                    'humidity': current.get('relative_humidity_2m'),
+                    'weather_code': current.get('weather_code')
                 }
             return None
         except Exception as e:
@@ -190,17 +261,24 @@ class WeatherGuessingGame:
     
     def get_advice(self):
         """Advice Slip API에서 조언 가져오기"""
+        if getattr(self, 'advice_used', False):
+            messagebox.showinfo("알림", "이미 조언을 받았습니다. 다음 도시로 이동하면 다시 받을 수 있습니다.")
+            return
+
         try:
             response = requests.get("https://api.adviceslip.com/advice", timeout=5)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 advice = data['slip']['advice']
-                
+
                 self.advice_text.config(state='normal')
                 self.advice_text.delete('1.0', 'end')
                 self.advice_text.insert('1.0', f"💡 {advice}")
                 self.advice_text.config(state='disabled')
+                # 한 번 조언을 받으면 비활성화
+                self.advice_used = True
+                self.advice_btn.config(state='disabled')
             else:
                 messagebox.showwarning("알림", "조언을 불러올 수 없습니다.")
         except Exception as e:
@@ -222,10 +300,12 @@ class WeatherGuessingGame:
         weather_desc = self.get_weather_description(weather['weather_code'])
         
         # 날씨 정보 표시
+        # 습도가 없는(과거 모드) 경우 안전하게 문자열 생성
+        humidity_text = f"💧 습도: {weather['humidity']}%\n" if weather.get('humidity') is not None else ""
         weather_info = (f"🌍 도시: {city}\n"
-                       f"🌡️ 현재 날씨: {weather_desc}\n"
-                       f"💧 습도: {weather['humidity']}%\n"
-                       f"❓ 현재 온도를 맞춰보세요!")
+                   f"🌡️ 현재 날씨: {weather_desc}\n"
+                   f"{humidity_text}"
+                   f"❓ 현재 온도를 맞춰보세요!")
         
         self.weather_label.config(text=weather_info)
         
@@ -234,7 +314,14 @@ class WeatherGuessingGame:
         self.game_active = True
         self.update_attempts()
         self.hint_label.config(text="범위: -30.0°C ~ 50.0°C")
-        
+        # 조언 상태 초기화
+        self.advice_used = False
+        self.advice_btn.config(state='normal')
+        self.advice_text.config(state='normal')
+        self.advice_text.delete('1.0', 'end')
+        self.advice_text.insert('1.0', "💡 '조언 받기' 버튼을 눌러 조언을 받아보세요!")
+        self.advice_text.config(state='disabled')
+
         # 버튼 상태 변경
         self.start_btn.config(state='disabled')
         self.guess_btn.config(state='normal')
@@ -244,6 +331,8 @@ class WeatherGuessingGame:
         messagebox.showinfo("게임 시작", 
                           f"{city}의 현재 온도를 맞춰보세요!\n"
                           f"10번의 기회가 있습니다. \n 소수점 첫째 자리까지 입력하세요.")
+        # 점수/콤보 UI 갱신
+        self.update_score_display()
     
     def update_attempts(self):
         """시도 횟수 업데이트"""
@@ -256,6 +345,17 @@ class WeatherGuessingGame:
         next_city = random.choice(available_cities)
         self.city_var.set(next_city)
         return next_city
+
+    def calculate_score_for_correct(self):
+        """정답 시 점수 계산 로직"""
+        base = max(10, 100 - (self.attempts - 1) * 10)
+        multiplier = 1 + (self.combo * 0.2)
+        points = int(base * multiplier)
+        return points
+
+    def update_score_display(self):
+        self.score_label.config(text=f"점수: {self.score}")
+        self.combo_label.config(text=f"콤보: {self.combo}")
 
     def check_guess(self):
         """추측 확인"""
@@ -273,19 +373,43 @@ class WeatherGuessingGame:
         self.update_attempts()
         
         diff = abs(self.target_temp - guess)
-        
-        # 정답 확인
-        if guess == self.target_temp:
+
+        # 난이도에 따른 판정
+        diff_threshold = 0.0
+        diff_mode = self.difficulty_var.get() if hasattr(self, 'difficulty_var') else '보통'
+        if diff_mode == '쉬움':
+            diff_threshold = 3.0
+        elif diff_mode == '보통':
+            diff_threshold = 1.0
+        else:
+            diff_threshold = 0.0
+
+        correct = (diff <= diff_threshold) if diff_threshold > 0 else (guess == self.target_temp)
+
+        # 정답 처리
+        if correct:
+            points = self.calculate_score_for_correct()
+            self.score += points
+            self.combo += 1
+            self.update_score_display()
+
             next_city = self.select_next_city()
             messagebox.showinfo("축하합니다! 🎉",
                               f"정답입니다!\n\n"
                               f"온도: {self.target_temp}°C\n"
-                              f"시도 횟수: {self.attempts}회\n\n"
+                              f"시도 횟수: {self.attempts}회\n"
+                              f"획득 점수: {points}점\n\n"
                               f"다음 도시 {next_city}로 이동합니다!")
-            self.start_game()  # 다음 도시로 자동 시작
+            # 다음 도시 자동 시작 (콤보 유지)
+            self.start_game()
             return
-        
-        # 힌트 제공
+
+        # 틀렸을 때 페널티
+        self.score = max(0, self.score - 5)
+        self.combo = 0
+        self.update_score_display()
+
+        # 힌트 제공 (거리 기준은 기존 표시 체계 유지)
         if diff <= 2:
             hint = "🔥 매우 뜨겁습니다! (±2°C 이내)"
         elif diff <= 5:
@@ -294,25 +418,28 @@ class WeatherGuessingGame:
             hint = "🌡️ 따뜻합니다! (±10°C 이내)"
         else:
             hint = "❄️ 차갑습니다! (±10°C 이상)"
-        
+
         if guess < self.target_temp:
             direction = "⬆️ UP! 더 높은 온도입니다."
         else:
             direction = "⬇️ DOWN! 더 낮은 온도입니다."
-        
+
         self.hint_label.config(text=f"{hint}\n{direction}")
-        
+
         # 시도 횟수 초과
         if self.attempts >= self.max_attempts:
             self.game_active = False
             self.guess_btn.config(state='disabled')
             self.start_btn.config(state='normal')
-            
+            # 최대 시도 초과 시 페널티
+            self.score = max(0, self.score - 20)
+            self.combo = 0
+            self.update_score_display()
             messagebox.showinfo("게임 종료",
                               f"시도 횟수를 모두 사용했습니다.\n\n"
                               f"정답: {self.target_temp}°C\n"
                               f"{self.city_name}의 현재 온도였습니다.")
-        
+
         self.temp_entry.delete(0, 'end')
         self.temp_entry.focus()
 
