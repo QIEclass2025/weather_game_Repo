@@ -121,6 +121,12 @@ class WeatherGuessingGame:
         self.date_entry = tk.Entry(settings_frame, width=15)
         self.date_entry.grid(row=1, column=1, sticky='w', pady=5)
 
+        # 조언 사용 토글
+        self.advice_enabled = tk.BooleanVar(value=True)
+        advice_check = tk.Checkbutton(settings_frame, text='조언 사용', variable=self.advice_enabled,
+                          bg='#E8EAF6', command=lambda: self._on_toggle_advice())
+        advice_check.grid(row=1, column=3, columnspan=2, sticky='w', padx=(20,0))
+
         # 점수 표시 프레임
         score_frame = tk.Frame(self.root, bg='#E3F2FD')
         score_frame.pack(pady=5)
@@ -261,6 +267,10 @@ class WeatherGuessingGame:
     
     def get_advice(self):
         """Advice Slip API에서 조언 가져오기"""
+        if not getattr(self, 'advice_enabled', tk.BooleanVar(value=True)).get():
+            messagebox.showinfo("알림", "조언 기능이 비활성화되어 있습니다. 설정에서 활성화하세요.")
+            return
+
         if getattr(self, 'advice_used', False):
             messagebox.showinfo("알림", "이미 조언을 받았습니다. 다음 도시로 이동하면 다시 받을 수 있습니다.")
             return
@@ -316,7 +326,11 @@ class WeatherGuessingGame:
         self.hint_label.config(text="범위: -30.0°C ~ 50.0°C")
         # 조언 상태 초기화
         self.advice_used = False
-        self.advice_btn.config(state='normal')
+        # advice 버튼은 사용 설정에 따라 활성화/비활성화
+        if getattr(self, 'advice_enabled', tk.BooleanVar(value=True)).get():
+            self.advice_btn.config(state='normal')
+        else:
+            self.advice_btn.config(state='disabled')
         self.advice_text.config(state='normal')
         self.advice_text.delete('1.0', 'end')
         self.advice_text.insert('1.0', "💡 '조언 받기' 버튼을 눌러 조언을 받아보세요!")
@@ -345,6 +359,19 @@ class WeatherGuessingGame:
         next_city = random.choice(available_cities)
         self.city_var.set(next_city)
         return next_city
+
+    def _on_toggle_advice(self):
+        """설정에서 조언 사용 토글 처리: 버튼 상태 업데이트"""
+        enabled = self.advice_enabled.get()
+        # 이미 조언을 사용한 상태이면 비활성화 유지
+        if not enabled:
+            self.advice_btn.config(state='disabled')
+        else:
+            # enabled True면, advice_used 상태에 따라 버튼 활성화
+            if getattr(self, 'advice_used', False):
+                self.advice_btn.config(state='disabled')
+            else:
+                self.advice_btn.config(state='normal')
 
     def calculate_score_for_correct(self):
         """정답 시 점수 계산 로직"""
